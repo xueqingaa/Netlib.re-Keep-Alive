@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import datetime, timedelta
 from time import sleep
 
 # ====== Telegram 配置 ======
@@ -21,7 +22,6 @@ def send_telegram(message: str):
 # ====== 获取账号列表 ======
 accounts = []
 
-# 优先读取多账号 ACCOUNTS
 ACCOUNTS_SECRET = os.getenv("ACCOUNTS")
 if ACCOUNTS_SECRET:
     for line in ACCOUNTS_SECRET.splitlines():
@@ -31,7 +31,6 @@ if ACCOUNTS_SECRET:
         username, password = line.split(":", 1)
         accounts.append({"username": username, "password": password})
 
-# 如果多账号没设置，再尝试单账号
 UZANTONOMO = os.getenv("UZANTONOMO")
 PASVORTO = os.getenv("PASVORTO")
 if not accounts and UZANTONOMO and PASVORTO:
@@ -41,28 +40,61 @@ if not accounts:
     send_telegram("Netlib KeepAlive: 没有检测到账号配置（ACCOUNTS 或 UZANTONOMO/PASVORTO）。")
     raise SystemExit("No accounts found")
 
-# ====== 模拟登录逻辑 ======
-def login(username, password):
-    # TODO: 替换成你原来的登录代码
-    print(f"正在登录账号: {username}")
-    sleep(2)  # 模拟登录等待
-    success = True  # 模拟登录成功
-    return success
+# ====== 倒计时逻辑 ======
+# 存储上次登录日期的文件
+STATE_FILE = "last_login.txt"
+today = datetime.now().date()
+INTERVAL_DAYS = 30  # 每30天登录一次
 
-# ====== 循环每个账号 ======
+# 读取上次登录日期
+if os.path.exists(STATE_FILE):
+    with open(STATE_FILE, "r") as f:
+        last_login_str = f.read().strip()
+        try:
+            last_login = datetime.strptime(last_login_str, "%Y-%m-%d").date()
+        except:
+            last_login = today - timedelta(days=INTERVAL_DAYS)
+else:
+    last_login = today - timedelta(days=INTERVAL_DAYS)
+
+# 计算倒计时天数
+days_since = (today - last_login).days
+days_left = max(INTERVAL_DAYS - days_since, 0)
+
+if days_left > 0:
+    send_telegram(f"Netlib KeepAlive: 距离下次登录还有 {days_left} 天 ⏳")
+    print(f"距离下次登录还有 {days_left} 天")
+    raise SystemExit("倒计时提醒完成，不执行登录")
+
+# ====== 登录函数（示例） ======
+def login(username, password):
+    # TODO: 替换为真实登录逻辑
+    print(f"正在登录账号: {username}")
+    sleep(2)  # 模拟登录
+    return True  # 模拟成功
+
+# ====== 循环每个账号登录 ======
+results = []
 for acc in accounts:
     user = acc["username"]
     pwd = acc["password"]
     try:
         ok = login(user, pwd)
         if ok:
-            msg = f"Netlib KeepAlive: 账号 {user} 登录成功 ✅"
+            msg = f"账号 {user} 登录成功 ✅"
         else:
-            msg = f"Netlib KeepAlive: 账号 {user} 登录失败 ❌"
+            msg = f"账号 {user} 登录失败 ❌"
         print(msg)
-        send_telegram(msg)
-        sleep(1)  # 每个账号间隔 1 秒
+        results.append(msg)
+        sleep(1)
     except Exception as e:
-        err_msg = f"Netlib KeepAlive: 账号 {user} 登录异常 ⚠️\n{e}"
+        err_msg = f"账号 {user} 登录异常 ⚠️\n{e}"
         print(err_msg)
-        send_telegram(err_msg)
+        results.append(err_msg)
+
+# ====== 登录完成后发送 TG 消息 ======
+send_telegram("Netlib KeepAlive: 执行完成\n" + "\n".join(results))
+
+# ====== 更新最后登录日期 ======
+with open(STATE_FILE, "w") as f:
+    f.write(today.strftime("%Y-%m-%d"))
