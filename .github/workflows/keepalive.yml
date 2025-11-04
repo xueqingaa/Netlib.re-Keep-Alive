@@ -1,35 +1,37 @@
-name: Teni Saluton Viva
+name: Netlib KeepAlive
 
 on:
   schedule:
-    - cron: "0 0 1,31 * *" 
-  workflow_dispatch:       # 支持手动触发
+    - cron: '0 0 1 * *'   # 每月 1 号运行，可改成每天 '0 0 * * *'
+  workflow_dispatch:       # 手动触发
 
 jobs:
-  run:
+  keepalive:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Elchecki deponejon
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Agordi Python
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: "3.10"
+          python-version: '3.10'
 
-      - name: Instali Playwright
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install playwright
-          python -m playwright install chromium
-          python -m pip install requests
+          pip install playwright requests
+          playwright install --with-deps
 
-      - name: Ruli Teni-Salutan-Staton
+      - name: Debug ACCOUNTS
+        run: |
+          echo "ACCOUNTS content:"
+          echo "$ACCOUNTS"
         env:
-          UZANTONOMO: ${{ secrets.UZANTONOMO }}
-          PASVORTO: ${{ secrets.PASVORTO }}
+          ACCOUNTS: ${{ secrets.ACCOUNTS }}
+
+      - name: Run Netlib KeepAlive
+        env:
+          ACCOUNTS: ${{ secrets.ACCOUNTS }}
           TELEGRAM_SIGNALO: ${{ secrets.TELEGRAM_SIGNALO }}
           TELEGRAM_BABILO_ID: ${{ secrets.TELEGRAM_BABILO_ID }}
-        run: |
-          python login.py
+        run: python login.py
